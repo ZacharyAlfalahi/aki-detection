@@ -2,8 +2,6 @@ import logging
 import os
 import socket
 import time
-from urllib.parse import urlparse
-
 import joblib
 from dotenv import load_dotenv
 
@@ -22,11 +20,9 @@ RECV_BUFFER_SIZE = 1024
 
 
 def get_host_port(address: str) -> tuple:
-    """Parse host and port from URL address."""
-    parsed = urlparse(address)
-    host = parsed.hostname
-    port = parsed.port
-    return host, port
+    """Parse host and port from address string like 'localhost:8440'."""
+    host, port_str = address.split(':')
+    return host, int(port_str)
 
 
 def recv_mllp_message(conn) -> str | None:
