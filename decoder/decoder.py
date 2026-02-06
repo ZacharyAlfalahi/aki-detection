@@ -1,6 +1,4 @@
 import hl7
-import numpy as np
-import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 from abc import ABC, abstractmethod
@@ -33,10 +31,10 @@ class MessageProcessor(ABC):
 class ADTA01Processor(MessageProcessor):
     def process(self, msg: HL7Message) -> dict:
         return {
-            "message_type": "admit",
+            "description": "admit",
             "message_time": str(msg.get("MSH", 7)),
-            "message_code": str(msg.get("MSH", 9)),
-            "patient_id": str(msg.get("PID", 3)),
+            "type": str(msg.get("MSH", 9)),
+            "mrn": str(msg.get("PID", 3)),
             "patient_name": str(msg.get("PID", 5)),
             "dob": str(msg.get("PID", 7)),
             "sex": str(msg.get("PID", 8)),
@@ -45,22 +43,22 @@ class ADTA01Processor(MessageProcessor):
 class ADTA03Processor(MessageProcessor):
     def process(self, msg: HL7Message) -> dict:
         return {
-            "message_type": "discharge",
+            "description": "discharge",
             "message_time": str(msg.get("MSH", 7)),
-            "message_code": str(msg.get("MSH", 9)),
-            "patient_id": str(msg.get("PID", 3)),
+            "type": str(msg.get("MSH", 9)),
+            "mrn": str(msg.get("PID", 3)),
         }
 
 class ORUR01Processor(MessageProcessor):
     def process(self, msg: HL7Message) -> dict:
         return {
-            "message_type": "blood_test",
+            "description": "blood_test",
             "message_time": str(msg.get("MSH", 7)),
-            "message_code": str(msg.get("MSH", 9)),
-            "patient_id": str(msg.get("PID", 3)),
-            "result_time": str(msg.get("OBR", 7)),
-            "retult_type": str(msg.get("OBX", 3)),
-            "result_value": str(msg.get("OBX", 5))
+            "type": str(msg.get("MSH", 9)),
+            "mrn": str(msg.get("PID", 3)),
+            "test_time": str(msg.get("OBR", 7)),
+            "test_type": str(msg.get("OBX", 3)),
+            "test_value": str(msg.get("OBX", 5))
         }
 
 def parse_text(txt):

@@ -1,0 +1,7 @@
+data/
+coursework3/
+*.pyc
+__pycache__/
+.env
+.git/
+*.md
