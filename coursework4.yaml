@@ -35,6 +35,8 @@ spec:
           value: spire-simulator.coursework4:8440
         - name: PAGER_ADDRESS
           value: spire-simulator.coursework4:8441
+        - name: PYTHONUNBUFFERED
+          value: "1"
         volumeMounts:
           - mountPath: "/data"
             name: hospital-history
@@ -43,8 +45,8 @@ spec:
             name: aki-detection-state
         resources:
           requests:
-            memory: 1Gi
-            cpu: 1
+            memory: 256Mi
+            cpu: 100m
       initContainers:
       - name: copy-hospital-history
         image: imperialswemlsspring2026.azurecr.io/coursework4-history
@@ -53,8 +55,8 @@ spec:
             name: hospital-history
         resources:
           requests:
-            memory: 1Gi
-            cpu: 1
+            memory: 256Mi
+            cpu: 100m
       volumes:
       - name: hospital-history
         emptyDir:
