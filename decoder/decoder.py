@@ -78,7 +78,9 @@ def process_message(txt):
     }
 
     MSH9 = str(msg.get("MSH", 9))
-    processor = _process_manual.get(MSH9)()
+    processor_cls = _process_manual.get(MSH9)
+    if processor_cls is None:
+        return {"type": MSH9}
 
-    return processor.process(msg)
+    return processor_cls().process(msg)
 

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def parse_hl7_time(timestamp: str):
     """Parses HL7 timestamps regardless of formatting to ensure correct ordering."""
-    for fmt in ("%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d"):
+    for fmt in ("%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(timestamp, fmt)
         except ValueError:
@@ -38,8 +38,8 @@ class CreatinineHistory:
                     date_val = row.get(date_key, "")
                     result_val = row.get(result_key, "")
 
-                    # Convert empty strings to None, append as tuple
-                    timestamp = date_val if date_val else None
+                    # Convert empty strings to None, parse to datetime for consistency
+                    timestamp = parse_hl7_time(date_val) if date_val else None
                     result = float(result_val) if result_val else None
 
                     self.data[mrn].append((timestamp, result))

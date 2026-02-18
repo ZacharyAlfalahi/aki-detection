@@ -1,3 +1,5 @@
+import logging
+import os
 from typing import Optional
 
 import pandas as pd
@@ -7,6 +9,8 @@ from .creatinine_history import CreatinineHistory, parse_hl7_time
 from .patient_info import PatientInfo
 from .creatinine_features import engineer_features
 from pager.pager import page_hospital
+
+logger = logging.getLogger(__name__)
 
 
 def _predict_aki(model, threshold: float, features: pd.DataFrame) -> bool:
@@ -25,9 +29,21 @@ class Processor:
     ):
         self.model = model
         self.threshold = threshold
-        self.history = cre_history if cre_history is not None else CreatinineHistory()
         self.patient_info = patient_info if patient_info is not None else PatientInfo()
         self.paged = set()
+
+        if cre_history is not None:
+            self.history = cre_history
+        else:
+            self.history = CreatinineHistory()
+            history_path = "/data/history.csv"
+            if not os.path.exists(history_path):
+                history_path = "./data/history.csv"
+            try:
+                self.history.load(history_path)
+                logger.info(f"Loaded history from {history_path}")
+            except FileNotFoundError:
+                logger.warning("No history file found, starting with empty history")
 
     def process_event(self, event) -> PagerDecision:
         """Handles one message (decides whether to page and updates patient history)."""
@@ -64,8 +80,9 @@ class Processor:
             age = details["age"]
             sex = details["sex"]
 
-            # Need multiple measurements to infer
-            if len(hist) < 2:
+            # Need multiple valid measurements to infer
+            valid_count = sum(1 for t, v in hist if t is not None and v is not None)
+            if valid_count < 2:
                 return PagerDecision(page=False, reason="insufficient history")
 
             # Check for duplicate pages
