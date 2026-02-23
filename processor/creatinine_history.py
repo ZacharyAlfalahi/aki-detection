@@ -10,7 +10,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
-def parse_hl7_time(timestamp: str):
+def parse_hl7_time(timestamp):
     """Parses HL7 timestamps regardless of formatting to ensure correct ordering."""
     for fmt in ("%Y%m%d%H%M%S", "%Y%m%d%H%M", "%Y%m%d", "%Y-%m-%d %H:%M:%S"):
         try:

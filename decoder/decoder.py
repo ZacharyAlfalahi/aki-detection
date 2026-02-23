@@ -1,6 +1,6 @@
 import hl7
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from abc import ABC, abstractmethod
 
 def parse_file(filename):
@@ -15,7 +15,7 @@ def parse_file(filename):
 class HL7Message:
     segments: Dict[str, List[List[str]]]
 
-    def get(self, seg: str, field_num: int) -> Optional[str]:
+    def get(self, seg, field_num):
 
         fields = self.segments.get(seg)
         if not fields:
@@ -25,11 +25,11 @@ class HL7Message:
 
 class MessageProcessor(ABC):
     @abstractmethod
-    def process(self, msg: HL7Message) -> Any:
+    def process(self, msg):
         raise NotImplementedError
 
 class ADTA01Processor(MessageProcessor):
-    def process(self, msg: HL7Message) -> dict:
+    def process(self, msg):
         return {
             "description": "admit",
             "message_time": str(msg.get("MSH", 7)),
@@ -41,7 +41,7 @@ class ADTA01Processor(MessageProcessor):
         }
 
 class ADTA03Processor(MessageProcessor):
-    def process(self, msg: HL7Message) -> dict:
+    def process(self, msg):
         return {
             "description": "discharge",
             "message_time": str(msg.get("MSH", 7)),
@@ -50,7 +50,7 @@ class ADTA03Processor(MessageProcessor):
         }
 
 class ORUR01Processor(MessageProcessor):
-    def process(self, msg: HL7Message) -> dict:
+    def process(self, msg):
         return {
             "description": "blood_test",
             "message_time": str(msg.get("MSH", 7)),

@@ -5,9 +5,6 @@ Combines functionality from patient_state.py and patient_details.py.
 """
 
 from datetime import datetime
-from typing import Optional
-
-
 class PatientInfo:
     """Unified tracker for patient admission status and demographics."""
 
@@ -15,7 +12,7 @@ class PatientInfo:
         self.admitted: dict[str, bool] = {}
         self.details: dict[str, dict] = {}
 
-    def admit(self, mrn: str, dob: str, sex: str) -> None:
+    def admit(self, mrn, dob, sex):
         """Record patient admission with demographics.
 
         Args:
@@ -33,14 +30,14 @@ class PatientInfo:
         )
         self.details[mrn] = {"age": age, "sex": sex}
 
-    def discharge(self, mrn: str) -> None:
+    def discharge(self, mrn):
         """Record patient discharge."""
         self.admitted[mrn] = False
 
-    def is_admitted(self, mrn: str) -> bool:
+    def is_admitted(self, mrn):
         """Check if patient is currently admitted."""
         return self.admitted.get(mrn, False)
 
-    def get_details(self, mrn: str) -> dict:
+    def get_details(self, mrn):
         """Get patient demographics (age, sex)."""
         return self.details.get(mrn, {"age": None, "sex": None})

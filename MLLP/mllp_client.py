@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from decoder.decoder import process_message
 from processor.processor import Processor
+from metrics.metrics import MESSAGES_RECEIVED, MLLP_RECONNECTIONS, MESSAGE_PROCESSING_LATENCY
 
 load_dotenv()
 
@@ -18,14 +19,18 @@ MLLP_END_BLOCK = b"\x1c"
 MLLP_CARRIAGE_RETURN = b"\x0d"
 RECV_BUFFER_SIZE = 1024
 
+# Reconnection settings
+INITIAL_RECONNECT_DELAY = 1  # seconds
+MAX_RECONNECT_DELAY = 30  # seconds
 
-def get_host_port(address: str) -> tuple:
+
+def get_host_port(address):
     """Parse host and port from address string like 'localhost:8440'."""
     host, port_str = address.split(':')
     return host, int(port_str)
 
 
-def recv_mllp_message(conn) -> str | None:
+def recv_mllp_message(conn):
     """Receive and decode an MLLP-framed message from the connection."""
     data = b""
     while True:
@@ -41,7 +46,7 @@ def recv_mllp_message(conn) -> str | None:
     return data[start:end].decode()
 
 
-def send_ack(conn) -> None:
+def send_ack(conn):
     """Send an ACK response over the connection."""
     ack = (
         "MSH|^~\\&|||||20240129093837||ACK|||2.5\r"
@@ -51,12 +56,8 @@ def send_ack(conn) -> None:
     conn.sendall(framed)
 
 
-def mllp_connection(mllp_address: str) -> None:
-    """Establish MLLP connection and process messages.
-
-    Args:
-        mllp_address: URL of the MLLP server (e.g., 'http://localhost:8440')
-    """
+def mllp_connection(mllp_address):
+    """Establish MLLP connection with automatic reconnection and process messages."""
     # Load model and threshold once at connection start
     model_path = os.path.join(os.path.dirname(__file__), "..", "saved_model", "model.pkl")
     threshold_path = os.path.join(os.path.dirname(__file__), "..", "saved_model", "threshold.pkl")
@@ -68,28 +69,46 @@ def mllp_connection(mllp_address: str) -> None:
     patient_processor = Processor(model=model, threshold=threshold)
 
     host, port = get_host_port(mllp_address)
-    logger.info(f"Connecting to MLLP server at {host}:{port}")
+    reconnect_delay = INITIAL_RECONNECT_DELAY
 
-    with socket.create_connection((host, port)) as conn:
-        logger.info("Connected successfully")
-        while True:
-            msg = recv_mllp_message(conn)
-            if msg is None:
-                logger.info("Connection closed by server")
-                break
+    while True:  # Outer reconnection loop
+        try:
+            logger.info(f"Connecting to MLLP server at {host}:{port}")
+            with socket.create_connection((host, port)) as conn:
+                logger.info("Connected successfully")
+                reconnect_delay = INITIAL_RECONNECT_DELAY  # Reset on success
 
-            start_time = time.time()
-            clean_message = process_message(msg)
-            decision = patient_processor.process_event(event=clean_message)
-            latency_ms = (time.time() - start_time) * 1000
+                while True:  # Inner message loop
+                    msg = recv_mllp_message(conn)
+                    if msg is None:
+                        logger.info("Connection closed by server, will reconnect")
+                        MLLP_RECONNECTIONS.inc()
+                        break
 
-            if decision.page:
-                logger.warning(
-                    f"AKI ALERT: Patient {decision.mrn} | "
-                    f"Test time: {decision.timestamp} | "
-                    f"Latency: {latency_ms:.2f}ms"
-                )
-            else:
-                logger.info(f"No page ({decision.reason}) | Latency: {latency_ms:.2f}ms")
+                    MESSAGES_RECEIVED.inc()
 
-            send_ack(conn)
+                    start_time = time.time()
+                    clean_message = process_message(msg)
+                    decision = patient_processor.process_event(event=clean_message)
+                    latency_s = time.time() - start_time
+                    MESSAGE_PROCESSING_LATENCY.observe(latency_s)
+
+                    latency_ms = latency_s * 1000
+                    if decision.page:
+                        logger.warning(
+                            f"AKI ALERT: Patient {decision.mrn} | "
+                            f"Test time: {decision.timestamp} | "
+                            f"Latency: {latency_ms:.2f}ms"
+                        )
+                    else:
+                        logger.info(f"No page ({decision.reason}) | Latency: {latency_ms:.2f}ms")
+
+                    send_ack(conn)
+
+        except (ConnectionError, OSError, socket.error) as e:
+            MLLP_RECONNECTIONS.inc()
+            logger.error(f"MLLP connection error: {e}")
+
+        logger.info(f"Reconnecting in {reconnect_delay}s...")
+        time.sleep(reconnect_delay)
+        reconnect_delay = min(reconnect_delay * 2, MAX_RECONNECT_DELAY)

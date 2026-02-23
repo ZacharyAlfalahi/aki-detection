@@ -14,6 +14,9 @@ COPY decoder/ ./decoder/
 COPY processor/ ./processor/
 COPY pager/ ./pager/
 COPY saved_model/ ./saved_model/
+COPY metrics/ ./metrics/
+
+EXPOSE 8000
 
 # Entry point
 CMD ["python", "main.py"]

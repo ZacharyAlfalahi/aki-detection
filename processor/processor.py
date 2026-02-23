@@ -1,19 +1,18 @@
 import logging
 import os
-from typing import Optional
-
 import pandas as pd
-
+from typing import Optional
 from .pager_decision import PagerDecision
 from .creatinine_history import CreatinineHistory, parse_hl7_time
 from .patient_info import PatientInfo
 from .creatinine_features import engineer_features
 from pager.pager import page_hospital
+from metrics.metrics import BLOOD_TESTS_RECEIVED, AKI_PREDICTIONS_TOTAL, AKI_POSITIVE_PREDICTIONS, BLOOD_TEST_VALUES
 
 logger = logging.getLogger(__name__)
 
 
-def _predict_aki(model, threshold: float, features: pd.DataFrame) -> bool:
+def _predict_aki(model, threshold, features):
     """Make AKI prediction using model and threshold."""
     prob = model.predict_proba(features)[:, 1]
     return bool(prob[0] >= threshold)
@@ -45,7 +44,7 @@ class Processor:
             except FileNotFoundError:
                 logger.warning("No history file found, starting with empty history")
 
-    def process_event(self, event) -> PagerDecision:
+    def process_event(self, event):
         """Handles one message (decides whether to page and updates patient history)."""
         msg_type = event["type"]
         mrn = event.get("mrn")
@@ -68,8 +67,14 @@ class Processor:
             if event["test_type"] != "CREATININE":
                 return PagerDecision(page=False, reason="invalid test type")
 
+            BLOOD_TESTS_RECEIVED.inc()
+
             # Update patient's creatinine history
             value = event["test_value"]
+            try:
+                BLOOD_TEST_VALUES.observe(float(value))
+            except (ValueError, TypeError):
+                pass
             test_time = event["test_time"]
             timestamp = parse_hl7_time(test_time)
 
@@ -96,8 +101,10 @@ class Processor:
 
             # Run model prediction
             aki = _predict_aki(self.model, self.threshold, features)
+            AKI_PREDICTIONS_TOTAL.inc()
 
             if aki:
+                AKI_POSITIVE_PREDICTIONS.inc()
                 self.paged.add((mrn, test_time))
                 page_hospital(mrn, test_time)
                 return PagerDecision(page=True, mrn=mrn, timestamp=test_time, reason="AKI detected")

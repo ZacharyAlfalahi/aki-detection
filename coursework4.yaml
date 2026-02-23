@@ -30,6 +30,10 @@ spec:
       - name: aki-detection
         image: imperialswemlsspring2026.azurecr.io/coursework4-spire
         command: ["python", "main.py"]
+        ports:
+        - containerPort: 8000
+          name: metrics
+          protocol: TCP
         env:
         - name: MLLP_ADDRESS
           value: spire-simulator.coursework4:8440
