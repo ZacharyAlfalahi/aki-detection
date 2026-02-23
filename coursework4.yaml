@@ -18,6 +18,8 @@ metadata:
   namespace: spire
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: aki-detection
@@ -28,7 +30,7 @@ spec:
     spec:
       containers:
       - name: aki-detection
-        image: imperialswemlsspring2026.azurecr.io/coursework4-spire
+        image: imperialswemlsspring2026.azurecr.io/coursework6-spire
         command: ["python", "main.py"]
         ports:
         - containerPort: 8000
@@ -36,9 +38,9 @@ spec:
           protocol: TCP
         env:
         - name: MLLP_ADDRESS
-          value: spire-simulator.coursework4:8440
+          value: spire-simulator.coursework6:8440
         - name: PAGER_ADDRESS
-          value: spire-simulator.coursework4:8441
+          value: spire-simulator.coursework6:8441
         - name: PYTHONUNBUFFERED
           value: "1"
         volumeMounts:
@@ -53,7 +55,7 @@ spec:
             cpu: 100m
       initContainers:
       - name: copy-hospital-history
-        image: imperialswemlsspring2026.azurecr.io/coursework4-history
+        image: imperialswemlsspring2026.azurecr.io/coursework6-history
         volumeMounts:
           - mountPath: "/data"
             name: hospital-history
@@ -68,3 +70,116 @@ spec:
       - name: aki-detection-state
         persistentVolumeClaim:
           claimName: aki-detection-state
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: spire
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    alerting:
+      alertmanagers:
+      - scheme: http
+        static_configs:
+        - targets:
+          - "prom-ui.coursework6:9093"
+
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    scrape_configs:
+      - job_name: 'aki-detection'
+        static_configs:
+          - targets: ['aki-detection:8000']
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: spire
+data:
+  alerts.yml: |
+    groups:
+    - name: aki-detection
+      rules:
+      - alert: AKIPagerAlertDropped
+        expr: increase(pager_alerts_dropped_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AKI alert dropped"
+          description: "An AKI alert could not be delivered to the pager after exhausting all retries."
+
+      - alert: PagerHighErrorRate
+        expr: increase(pager_http_errors_total[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pager errors detected"
+          description: "Multiple pager HTTP errors in the last 5 minutes."
+
+      - alert: MLLPFrequentReconnections
+        expr: increase(mllp_reconnections_total[10m]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MLLP connection unstable"
+          description: "MLLP has reconnected more than 3 times in the last 10 minutes."
+
+      - alert: NoMessagesReceived
+        expr: increase(messages_received_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No HL7 messages received"
+          description: "No MLLP messages received in the last 10 minutes - connection may be down."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: spire
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.53.0
+        args:
+          - "--config.file=/etc/prometheus/prometheus.yml"
+          - "--storage.tsdb.path=/prometheus"
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+        - name: rules
+          mountPath: /etc/prometheus/rules
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: rules
+        configMap:
+          name: prometheus-rules
