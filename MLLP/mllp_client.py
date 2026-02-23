@@ -1,12 +1,9 @@
 import logging
-import os
 import socket
 import time
-import joblib
 from dotenv import load_dotenv
 
 from decoder.decoder import process_message
-from processor.processor import Processor
 from metrics.metrics import MESSAGES_RECEIVED, MLLP_RECONNECTIONS, MESSAGE_PROCESSING_LATENCY
 
 load_dotenv()
@@ -56,18 +53,8 @@ def send_ack(conn):
     conn.sendall(framed)
 
 
-def mllp_connection(mllp_address):
+def mllp_connection(mllp_address, patient_processor):
     """Establish MLLP connection with automatic reconnection and process messages."""
-    # Load model and threshold once at connection start
-    model_path = os.path.join(os.path.dirname(__file__), "..", "saved_model", "model.pkl")
-    threshold_path = os.path.join(os.path.dirname(__file__), "..", "saved_model", "threshold.pkl")
-
-    model = joblib.load(model_path)
-    threshold = joblib.load(threshold_path)
-
-    # Create single processor instance to maintain state across all messages
-    patient_processor = Processor(model=model, threshold=threshold)
-
     host, port = get_host_port(mllp_address)
     reconnect_delay = INITIAL_RECONNECT_DELAY
 

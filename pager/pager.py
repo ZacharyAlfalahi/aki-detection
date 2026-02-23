@@ -3,7 +3,7 @@ import os
 import time
 import requests
 from dotenv import load_dotenv
-from metrics.metrics import PAGER_REQUESTS, PAGER_ERRORS
+from metrics.metrics import PAGER_REQUESTS, PAGER_ERRORS, PAGER_ALERTS_DROPPED
 
 load_dotenv()
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 PAGER_ADDRESS = os.environ.get("PAGER_ADDRESS")
 
-MAX_RETRIES = 2
+MAX_RETRIES = 3
 INITIAL_RETRY_DELAY = 0.5  # seconds
 MAX_RETRY_DELAY = 1  # seconds
 
@@ -54,4 +54,5 @@ def page_hospital(mrn, test_time, pager_url=PAGER_ADDRESS):
             time.sleep(retry_delay)
             retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)
 
+    PAGER_ALERTS_DROPPED.inc()
     logger.error(f"Pager failed after {MAX_RETRIES} attempts for MRN {mrn}")

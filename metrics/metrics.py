@@ -31,6 +31,11 @@ PAGER_ERRORS = Counter(
     "Total number of pager HTTP errors (non-200, timeout, connection)"
 )
 
+PAGER_ALERTS_DROPPED = Counter(
+    "pager_alerts_dropped_total",
+    "Total number of AKI alerts silently dropped after exhausting all pager retries"
+)
+
 MLLP_RECONNECTIONS = Counter(
     "mllp_reconnections_total",
     "Total number of MLLP reconnection attempts"
