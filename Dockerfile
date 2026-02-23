@@ -15,6 +15,7 @@ COPY processor/ ./processor/
 COPY pager/ ./pager/
 COPY saved_model/ ./saved_model/
 COPY metrics/ ./metrics/
+COPY state/ ./state/
 
 EXPOSE 8000
 
